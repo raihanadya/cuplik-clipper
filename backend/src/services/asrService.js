@@ -30,7 +30,7 @@ const transcribe = async (audioPath, vocabulary) => {
         headers: {
           ...form.getHeaders(),
           accept: 'application/json',
-          authorization: `Bearer ${ENV.MLAPI_KEY}`,
+          authorization: `Bearer ${ENV.API_KEY}`,
         },
       },
       (res) => {

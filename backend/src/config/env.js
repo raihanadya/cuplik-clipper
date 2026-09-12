@@ -8,7 +8,7 @@ const ENV = {
   REDIS_PORT: parseInt(process.env.REDIS_PORT, 10) || 6379,
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
-  MLAPI_KEY: process.env.MLAPI_KEY,
+  API_KEY: process.env.API_KEY,
   ASR_API_URL: process.env.ASR_API_URL,
   LLM_API_URL: process.env.LLM_API_URL,
   SMTP_HOST: process.env.SMTP_HOST,

@@ -22,8 +22,8 @@ Cuplik adalah platform web untuk merepurposing rekaman webinar (30-60 menit) men
 | Queue | BullMQ + Redis | Gratis (open-source), fitur lengkap (priority, retry, delayed) |
 | File Storage | Local filesystem | Simpel untuk MVP |
 | Auth | JWT Token | Stateless, mudah di-scale |
-| ASR | Whisper Large-v3 via mlapi.run | Custom endpoint, word-level timestamps |
-| LLM | GPT 5.6 Luna via mlapi.run | Custom endpoint, structured output |
+| ASR | Whisper Large-v3 via Elice AI Cloud | Custom endpoint, word-level timestamps |
+| LLM | GPT 5.6 Luna via Elice AI Cloud | Custom endpoint, structured output |
 | Video Processing | FFmpeg (via fluent-ffmpeg) | Industry standard, gratis |
 
 ---
@@ -481,7 +481,7 @@ const rerenderQueue = new Queue('cuplik-rerender', { connection: redis });
   // POST https://mlapi.run/805a20fb-b66b-4b7c-84fb-079c12b76937
   // Headers:
   //   - accept: application/json
-  //   - authorization: Bearer {ASR_API_KEY}
+  //   - authorization: Bearer {API_KEY}
   //   - content-type: application/json
   // Body: { file: audioData, language: "id", prompt: vocabulary }
   // Return: [{ word, start_time, end_time, confidence }]
@@ -496,7 +496,7 @@ const rerenderQueue = new Queue('cuplik-rerender', { connection: redis });
   // POST https://mlapi.run/286e9158-d32e-436d-a23d-36b43fc8e68a
   // Headers:
   //   - accept: application/json
-  //   - authorization: Bearer {LLM_API_KEY}
+  //   - authorization: Bearer {API_KEY}
   //   - content-type: application/json
   // Body: { messages: [...], response_format: { type: "json_object" } }
   // Return: [{ clip_id, start_time_seconds, end_time_seconds, duration,
@@ -598,8 +598,8 @@ REDIS_PORT=6379
 JWT_SECRET=your-super-secret-jwt-key-here
 JWT_EXPIRES_IN=24h
 
-# mlapi.run API (Whisper Large-v3 + GPT 5.6 Luna)
-MLAPI_KEY=your-mlapi-api-key
+# Elice AI Cloud API (Whisper Large-v3 + GPT 5.6 Luna)
+API_KEY=your-api-key
 ASR_API_URL=https://mlapi.run/805a20fb-b66b-4b7c-84fb-079c12b76937
 LLM_API_URL=https://mlapi.run/286e9158-d32e-436d-a23d-36b43fc8e68a
 
@@ -685,7 +685,7 @@ cron.schedule('0 * * * *', async () => {
 
 ## 13. API Cost Estimation
 
-Cost tergantung pada pricing mlapi.run. Estimasi:
+Cost tergantung pada pricing Elice AI Cloud. Estimasi:
 
 | Service | Endpoint | Notes |
 |---------|----------|-------|

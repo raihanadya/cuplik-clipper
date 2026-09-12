@@ -46,6 +46,48 @@ const login = async (req, res) => {
   }
 };
 
+const register = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email dan password wajib diisi.' });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        error: 'Password tidak valid: minimal 8 karakter, harus mengandung huruf kapital, huruf kecil, angka, dan simbol.'
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email tidak valid.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await User.create({
+      email,
+      password: hashedPassword,
+      role: 'user',
+    });
+
+    const token = jwt.sign({ id: user._id, role: user.role }, ENV.JWT_SECRET, {
+      expiresIn: ENV.JWT_EXPIRES_IN,
+    });
+
+    res.status(201).json({
+      token,
+      user: { id: user._id, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+};
+
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -82,6 +124,13 @@ const resetPassword = async (req, res) => {
     const { token, new_password } = req.body;
     if (!token || !new_password) {
       return res.status(400).json({ error: 'Token dan password baru wajib diisi.' });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+    if (!passwordRegex.test(new_password)) {
+      return res.status(400).json({
+        error: 'Password tidak valid: minimal 8 karakter, harus mengandung huruf kapital, huruf kecil, angka, dan simbol.'
+      });
     }
 
     const resetRecord = await PasswordReset.findOne({ token, used: false });
@@ -137,4 +186,30 @@ const deactivateUser = async (req, res) => {
   }
 };
 
-module.exports = { login, forgotPassword, resetPassword, activateUser, deactivateUser };
+const deleteAccount = async (req, res) => {
+  try {
+    const { password, permanent } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password wajib diisi untuk menghapus akun.' });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Password salah.' });
+    }
+
+    if (permanent === true) {
+      await User.findByIdAndDelete(req.user._id);
+      res.json({ message: 'Akun berhasil dihapus permanen.' });
+    } else {
+      await User.findByIdAndUpdate(req.user._id, { is_active: false });
+      res.json({ message: 'Akun berhasil dinonaktifkan. Hubungi admin untuk mengaktifkan kembali.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+};
+
+module.exports = { register, login, forgotPassword, resetPassword, activateUser, deactivateUser, deleteAccount };

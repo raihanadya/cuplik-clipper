@@ -52,7 +52,7 @@ const selectConcepts = async (transcript, vocabulary) => {
         headers: {
           'content-type': 'application/json',
           accept: 'application/json',
-          authorization: `Bearer ${ENV.MLAPI_KEY}`,
+          authorization: `Bearer ${ENV.API_KEY}`,
         },
       },
       (res) => {
