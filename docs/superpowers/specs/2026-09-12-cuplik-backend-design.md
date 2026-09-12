@@ -22,8 +22,8 @@ Cuplik adalah platform web untuk merepurposing rekaman webinar (30-60 menit) men
 | Queue | BullMQ + Redis | Gratis (open-source), fitur lengkap (priority, retry, delayed) |
 | File Storage | Local filesystem | Simpel untuk MVP |
 | Auth | JWT Token | Stateless, mudah di-scale |
-| ASR | Custom AI (API key sendiri) | Keputusan tim |
-| LLM | OpenAI API (GPT-4) | Untuk concept-based segment selection |
+| ASR | Custom AI (Elice Cloud AI) | Keputusan tim |
+| LLM | Custom AI (Elice Cloud AI) | Keputusan tim |
 | Video Processing | FFmpeg (via fluent-ffmpeg) | Industry standard, gratis |
 
 ---
@@ -55,7 +55,8 @@ cuplik-backend/
 │   │   ├── ingestService.js   # Validasi & ekstraksi audio
 │   │   ├── asrService.js      # Integrasi ASR API
 │   │   ├── llmService.js      # OpenAI concept selection
-│   │   └── renderService.js   # FFmpeg rendering
+│   │   ├── renderService.js   # FFmpeg rendering
+│   │   └── emailService.js    # Kirim email (forgot password)
 │   ├── workers/
 │   │   ├── pipelineWorker.js  # BullMQ worker utama
 │   │   └── rerenderWorker.js  # Worker delta re-render
@@ -87,10 +88,33 @@ cuplik-backend/
   email: String (unique, required),
   password: String (hashed, required),
   role: String (enum: ['user', 'admin'], default: 'user'),
+  is_active: Boolean (default: true),  // Soft delete: false = nonaktif, bisa diaktifkan lagi
   createdAt: Date,
   updatedAt: Date
 }
 ```
+
+**Notes:**
+- `is_active: false` = user "dihapus" (soft delete), bisa diaktifkan lagi oleh admin
+- Login hanya boleh jika `is_active: true`
+- Admin bisa melihat semua user (termasuk nonaktif) dan mengaktifkan kembali
+
+### 4.1.1 PasswordReset (untuk forgot password)
+
+```javascript
+{
+  _id: ObjectId,
+  userId: ObjectId (ref: User, required),
+  token: String (required, unique),  // Random token untuk reset
+  expiresAt: Date (required),       // Token expired dalam 15 menit
+  used: Boolean (default: false),   // Sudah dipakai atau belum
+  createdAt: Date
+}
+```
+
+**Indexes:**
+- `{ token: 1 }` (unique)
+- `{ expiresAt: 1 }` (TTL index, auto-delete setelah expired)
 
 ### 4.2 Session (Sesi Pemrosesan)
 
@@ -190,8 +214,16 @@ cuplik-backend/
 | Method | Endpoint | Fungsi | Auth |
 |--------|----------|--------|------|
 | POST | `/api/v1/auth/login` | Login, dapat JWT | ❌ |
+| POST | `/api/v1/auth/forgot-password` | Kirim reset token ke email | ❌ |
+| POST | `/api/v1/auth/reset-password` | Reset password pakai token | ❌ |
+| PATCH | `/api/v1/admin/users/:user_id/activate` | Aktifkan user nonaktif | ✅ (admin) |
+| PATCH | `/api/v1/admin/users/:user_id/deactivate` | Nonaktifkan user | ✅ (admin) |
 
-**Request:**
+**Login Rules:**
+- Login hanya berhasil jika `is_active: true`
+- Jika `is_active: false`, kembali `{ error: "Akun tidak aktif. Hubungi admin." }`
+
+**Request (Login):**
 ```json
 {
   "email": "user@example.com",
@@ -200,7 +232,7 @@ cuplik-backend/
 }
 ```
 
-**Response:**
+**Response (Login):**
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
@@ -211,6 +243,43 @@ cuplik-backend/
   }
 }
 ```
+
+**Request (Forgot Password):**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response (Forgot Password):**
+```json
+{
+  "message": "Jika email terdaftar, link reset password telah dikirim."
+}
+```
+
+**Request (Reset Password):**
+```json
+{
+  "token": "abc123-reset-token",
+  "new_password": "newSecret456"
+}
+```
+
+**Response (Reset Password):**
+```json
+{
+  "message": "Password berhasil direset. Silakan login dengan password baru."
+}
+```
+
+**Forgot Password Flow:**
+1. User POST `/api/v1/auth/forgot-password` dengan email
+2. System generate reset token (expiry 15 menit), simpan di MongoDB
+3. System kirim email berisi link `https://frontend.com/reset-password?token=xxx`
+4. User buka link, isi password baru
+5. User POST `/api/v1/auth/reset-password` dengan token + new_password
+6. System update password hash, hapus token
 
 ### 5.2 Workspace
 
@@ -525,6 +594,13 @@ ASR_API_KEY=your-asr-api-key
 OPENAI_API_KEY=sk-your-openai-api-key
 OPENAI_MODEL=gpt-4
 
+# Email (untuk forgot password)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+EMAIL_FROM=noreply@cuplik.id
+
 # File Storage
 UPLOAD_DIR=./uploads
 OUTPUT_DIR=./output
@@ -548,6 +624,10 @@ MAX_DURATION=2700         # 45 minutes in seconds
 | FFmpeg gagal | 500 | `{ error: "Rendering gagal. Silakan coba lagi." }` |
 | File tidak ditemukan | 404 | `{ error: "File tidak ditemukan." }` |
 | Unauthorized | 401 | `{ error: "Token tidak valid atau expired." }` |
+| Akun nonaktif | 403 | `{ error: "Akun tidak aktif. Hubungi admin." }` |
+| Email tidak ditemukan | 404 | `{ error: "Email tidak terdaftar." }` |
+| Token expired | 400 | `{ error: "Token sudah expired. Silakan request ulang." }` |
+| Token sudah dipakai | 400 | `{ error: "Token sudah digunakan." }` |
 | Session tidak ditemukan | 404 | `{ error: "Sesi pemrosesan tidak ditemukan." }` |
 | Clip tidak ditemukan | 404 | `{ error: "Klip tidak ditemukan." }` |
 
