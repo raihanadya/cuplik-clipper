@@ -29,6 +29,13 @@ Backend API untuk platform repurposing webinar ke klip vertikal bersubtitle.
    npm run worker     # Pipeline worker
    ```
 
+## Build & Obfuscation
+
+```bash
+npm run build        # Obfuscate source code ke folder dist/
+npm run start:prod   # Jalankan versi production (obfuscated)
+```
+
 ## API Endpoints
 
 ### Auth
