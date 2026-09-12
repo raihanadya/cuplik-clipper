@@ -33,7 +33,7 @@ const rerender = async (req, res) => {
     res.json({
       clip_id: req.params.clip_id,
       status: 'rendering',
-      message: 'Re-render dimulai, estimasi < 60 detik.',
+      new_video_url: `/api/v1/clips/${req.params.clip_id}/download/mp4`,
     });
   } catch (error) {
     res.status(500).json({ error: 'Terjadi kesalahan server.' });

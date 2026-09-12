@@ -105,6 +105,7 @@ const getClips = async (req, res) => {
         concept_score: c.conceptScore,
         suggested_title: c.suggestedTitle,
         pedagogical_reason: c.pedagogicalReason,
+        video_preview_url: c.status === 'done' ? `/api/v1/clips/${c.clipId}/download/mp4` : null,
         subtitles: c.subtitles,
         status: c.status,
       })),
