@@ -29,7 +29,6 @@ const clipSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-clipSchema.index({ clipId: 1 });
 clipSchema.index({ sessionId: 1 });
 
 module.exports = mongoose.model('Clip', clipSchema);
