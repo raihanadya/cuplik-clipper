@@ -20,6 +20,7 @@ const ENV = {
   OUTPUT_DIR: process.env.OUTPUT_DIR || './output',
   MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE, 10) || 1073741824,
   MAX_DURATION: parseInt(process.env.MAX_DURATION, 10) || 2700,
+  CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
 };
 
 module.exports = ENV;

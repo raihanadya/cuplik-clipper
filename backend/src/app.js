@@ -18,7 +18,7 @@ const app = express();
 
 // Security
 app.use(helmet());
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
+app.use(cors({ origin: ENV.CORS_ORIGIN, methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
 
 // Logging
 app.use(morgan('dev'));
