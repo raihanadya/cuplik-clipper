@@ -22,8 +22,8 @@ Cuplik adalah platform web untuk merepurposing rekaman webinar (30-60 menit) men
 | Queue | BullMQ + Redis | Gratis (open-source), fitur lengkap (priority, retry, delayed) |
 | File Storage | Local filesystem | Simpel untuk MVP |
 | Auth | JWT Token | Stateless, mudah di-scale |
-| ASR | OpenAI Whisper Large-v3 API | Murah ($0.006/mnt), akurasi bagus untuk Bahasa Indonesia, word-level timestamps |
-| LLM | OpenAI GPT-4 | Structured output bagus untuk concept selection |
+| ASR | Whisper Large-v3 via mlapi.run | Custom endpoint, word-level timestamps |
+| LLM | GPT 5.6 Luna via mlapi.run | Custom endpoint, structured output |
 | Video Processing | FFmpeg (via fluent-ffmpeg) | Industry standard, gratis |
 
 ---
@@ -426,7 +426,7 @@ const rerenderQueue = new Queue('cuplik-rerender', { connection: redis });
                      ▼
   ┌─────────────────────────────────────┐
   │ STAGE 2: TRANSCRIPTION (ASR)        │
-  │ - Kirim audio ke OpenAI Whisper API  │
+  │ - Kirim audio ke Whisper Large-v3 API  │
   │ - Terima word-level timestamps      │
   │ - Simpan transcript ke MongoDB      │
   └─────────────────────────────────────┘
@@ -434,7 +434,7 @@ const rerenderQueue = new Queue('cuplik-rerender', { connection: redis });
                      ▼
   ┌─────────────────────────────────────┐
   │ STAGE 3: CURATION (LLM)            │
-  │ - Kirim transcript ke OpenAI API    │
+  │ - Kirim transcript ke GPT 5.6 Luna API    │
   │ - Prompt: concept completeness      │
   │ - Terima 3-5 segmen + scores       │
   │ - Simpan clips ke MongoDB           │
@@ -477,15 +477,14 @@ const rerenderQueue = new Queue('cuplik-rerender', { connection: redis });
 ```javascript
 // Fungsi utama:
 - transcribe(audioPath, vocabulary?)
-  // Kirim audio ke OpenAI Whisper API
-  // POST https://api.openai.com/v1/audio/transcriptions
-  // - model: "whisper-large-v3"
-  // - language: "id"
-  // - prompt: custom vocabulary (optional)
-  // - timestamp_granularities: ["word"]
+  // Kirim audio ke Whisper Large-v3 API
+  // POST https://mlapi.run/805a20fb-b66b-4b7c-84fb-079c12b76937
+  // Headers:
+  //   - accept: application/json
+  //   - authorization: Bearer {ASR_API_KEY}
+  //   - content-type: application/json
+  // Body: { file: audioData, language: "id", prompt: vocabulary }
   // Return: [{ word, start_time, end_time, confidence }]
-
-// Cost: $0.006/minute → video 45 menit ≈ $0.27
 ```
 
 ### 7.3 LLMService
@@ -493,7 +492,13 @@ const rerenderQueue = new Queue('cuplik-rerender', { connection: redis });
 ```javascript
 // Fungsi utama:
 - selectConcepts(transcript, vocabulary?)
-  // Kirim ke OpenAI dengan structured prompt
+  // Kirim ke GPT 5.6 Luna API
+  // POST https://mlapi.run/286e9158-d32e-436d-a23d-36b43fc8e68a
+  // Headers:
+  //   - accept: application/json
+  //   - authorization: Bearer {LLM_API_KEY}
+  //   - content-type: application/json
+  // Body: { messages: [...], response_format: { type: "json_object" } }
   // Return: [{ clip_id, start_time_seconds, end_time_seconds, duration,
   //            concept_score, suggested_title, pedagogical_reason }]
 
@@ -593,10 +598,10 @@ REDIS_PORT=6379
 JWT_SECRET=your-super-secret-jwt-key-here
 JWT_EXPIRES_IN=24h
 
-# OpenAI (untuk ASR Whisper + LLM GPT-4)
-OPENAI_API_KEY=sk-your-openai-api-key
-WHISPER_MODEL=whisper-large-v3
-OPENAI_MODEL=gpt-4
+# mlapi.run API (Whisper Large-v3 + GPT 5.6 Luna)
+MLAPI_KEY=your-mlapi-api-key
+ASR_API_URL=https://mlapi.run/805a20fb-b66b-4b7c-84fb-079c12b76937
+LLM_API_URL=https://mlapi.run/286e9158-d32e-436d-a23d-36b43fc8e68a
 
 # Email (untuk forgot password)
 SMTP_HOST=smtp.gmail.com
@@ -678,15 +683,11 @@ cron.schedule('0 * * * *', async () => {
 
 ---
 
-## 13. API Cost Estimation (per video 45 menit)
+## 13. API Cost Estimation
 
-| Service | Pricing | Cost per Video |
-|---------|---------|----------------|
-| OpenAI Whisper (ASR) | $0.006/minute | $0.27 |
-| OpenAI GPT-4 (LLM) | $0.03/1K tokens (input) + $0.06/1K tokens (output) | ~$0.50-1.00 |
-| **Total per video** | | **~$0.77-1.27** |
+Cost tergantung pada pricing mlapi.run. Estimasi:
 
-**Estimasi bulanan (10 video/minggu):**
-- ASR: $0.27 × 40 = $10.80
-- LLM: $0.75 × 40 = $30.00
-- **Total: ~$40.80/bulan**
+| Service | Endpoint | Notes |
+|---------|----------|-------|
+| ASR (Whisper Large-v3) | `https://mlapi.run/805a20fb-...` | Word-level timestamps |
+| LLM (GPT 5.6 Luna) | `https://mlapi.run/286e9158-...` | Structured JSON output |
