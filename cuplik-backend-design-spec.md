@@ -22,8 +22,8 @@ Cuplik adalah platform web untuk merepurposing rekaman webinar (30-60 menit) men
 | Queue | BullMQ + Redis | Gratis (open-source), fitur lengkap (priority, retry, delayed) |
 | File Storage | Local filesystem | Simpel untuk MVP |
 | Auth | JWT Token | Stateless, mudah di-scale |
-| ASR | Custom AI (Elice Cloud AI) | Keputusan tim |
-| LLM | Custom AI (Elice Cloud AI) | Keputusan tim |
+| ASR | OpenAI Whisper Large-v3 API | Murah ($0.006/mnt), akurasi bagus untuk Bahasa Indonesia, word-level timestamps |
+| LLM | OpenAI GPT-4 | Structured output bagus untuk concept selection |
 | Video Processing | FFmpeg (via fluent-ffmpeg) | Industry standard, gratis |
 
 ---
@@ -426,7 +426,7 @@ const rerenderQueue = new Queue('cuplik-rerender', { connection: redis });
                      ▼
   ┌─────────────────────────────────────┐
   │ STAGE 2: TRANSCRIPTION (ASR)        │
-  │ - Kirim audio ke Custom ASR API     │
+  │ - Kirim audio ke OpenAI Whisper API  │
   │ - Terima word-level timestamps      │
   │ - Simpan transcript ke MongoDB      │
   └─────────────────────────────────────┘
@@ -477,8 +477,15 @@ const rerenderQueue = new Queue('cuplik-rerender', { connection: redis });
 ```javascript
 // Fungsi utama:
 - transcribe(audioPath, vocabulary?)
-  // POST ke ASR_API_URL dengan audio + custom vocabulary
+  // Kirim audio ke OpenAI Whisper API
+  // POST https://api.openai.com/v1/audio/transcriptions
+  // - model: "whisper-large-v3"
+  // - language: "id"
+  // - prompt: custom vocabulary (optional)
+  // - timestamp_granularities: ["word"]
   // Return: [{ word, start_time, end_time, confidence }]
+
+// Cost: $0.006/minute → video 45 menit ≈ $0.27
 ```
 
 ### 7.3 LLMService
@@ -586,12 +593,9 @@ REDIS_PORT=6379
 JWT_SECRET=your-super-secret-jwt-key-here
 JWT_EXPIRES_IN=24h
 
-# ASR Engine (Custom AI)
-ASR_API_URL=https://your-asr-api.com/v1/transcribe
-ASR_API_KEY=your-asr-api-key
-
-# OpenAI (untuk LLM Concept Selection)
+# OpenAI (untuk ASR Whisper + LLM GPT-4)
 OPENAI_API_KEY=sk-your-openai-api-key
+WHISPER_MODEL=whisper-large-v3
 OPENAI_MODEL=gpt-4
 
 # Email (untuk forgot password)
@@ -671,3 +675,18 @@ cron.schedule('0 * * * *', async () => {
 | NFR-2 (Queue isolation) | BullMQ worker terpisah dari web server |
 | NFR-3 (24h retention) | Cron job cleanup |
 | NFR-4 (Real-time status) | Polling 5 detik via REST API |
+
+---
+
+## 13. API Cost Estimation (per video 45 menit)
+
+| Service | Pricing | Cost per Video |
+|---------|---------|----------------|
+| OpenAI Whisper (ASR) | $0.006/minute | $0.27 |
+| OpenAI GPT-4 (LLM) | $0.03/1K tokens (input) + $0.06/1K tokens (output) | ~$0.50-1.00 |
+| **Total per video** | | **~$0.77-1.27** |
+
+**Estimasi bulanan (10 video/minggu):**
+- ASR: $0.27 × 40 = $10.80
+- LLM: $0.75 × 40 = $30.00
+- **Total: ~$40.80/bulan**
