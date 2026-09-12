@@ -9,6 +9,7 @@
     "worker": "node src/workers/pipelineWorker.js",
     "build": "node obfuscate.js",
     "start:prod": "node dist/app.js",
+    "seed:admin": "node src/scripts/seed-admin.js",
     "test": "jest --verbose"
   },
   "keywords": [],

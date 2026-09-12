@@ -8,10 +8,10 @@ const ENV = require('../config/env');
 
 const login = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
 
-    if (!email || !password || !role) {
-      return res.status(400).json({ error: 'Email, password, dan role wajib diisi.' });
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email dan password wajib diisi.' });
     }
 
     const user = await User.findOne({ email }).select('+password');
@@ -21,10 +21,6 @@ const login = async (req, res) => {
 
     if (!user.is_active) {
       return res.status(403).json({ error: 'Akun tidak aktif. Hubungi admin.' });
-    }
-
-    if (user.role !== role) {
-      return res.status(403).json({ error: 'Role tidak sesuai.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -83,7 +79,7 @@ const register = async (req, res) => {
       user: { id: user._id, email: user.email, role: user.role },
     });
   } catch (error) {
-    console.error('Register error:', error);
+    console.error('Register error:', error.message);
     res.status(500).json({ error: 'Terjadi kesalahan server.' });
   }
 };
@@ -212,4 +208,42 @@ const deleteAccount = async (req, res) => {
   }
 };
 
-module.exports = { register, login, forgotPassword, resetPassword, activateUser, deactivateUser, deleteAccount };
+const createAdmin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email dan password wajib diisi.' });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        error: 'Password tidak valid: minimal 8 karakter, harus mengandung huruf kapital, huruf kecil, angka, dan simbol.'
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email sudah terdaftar.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await User.create({
+      email,
+      password: hashedPassword,
+      role: 'admin',
+    });
+
+    res.status(201).json({
+      message: 'Admin berhasil dibuat.',
+      user: { id: user._id, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    console.error('Create admin error:', error.message);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+};
+
+module.exports = { register, login, forgotPassword, resetPassword, activateUser, deactivateUser, deleteAccount, createAdmin };
