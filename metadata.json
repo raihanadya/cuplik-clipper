@@ -1,0 +1,8 @@
+{
+  "name": "Remix Cuplik",
+  "description": "AI-powered video clipping and automated short-form vertical conversion with Indonesian captions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
